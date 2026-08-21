@@ -1,130 +1,124 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="lo">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>CPM Dashboard V3.0.0</title>
-<meta name="description" content="CPM construction dashboard with a full connected network and Microsoft Project-style Gantt calendar.">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ແຜນຄວບຄຸມວຽກກໍ່ສ້າງ — CPM Dashboard</title>
+<meta name="description" content="Critical Path Method dashboard for a 161-activity construction schedule — ES/EF/LS/LF/TF, network diagram, and Gantt view.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="grid-bg"></div>
 
-<header class="app-header">
-  <div class="brand">
-    <div class="brand-kicker">CPM · CRITICAL PATH METHOD</div>
-    <div class="brand-title">ແຜນຄວບຄຸມວຽກກໍ່ສ້າງ</div>
-    <div class="brand-sub">V3.0 · Full Connected Network · Microsoft Project Style Gantt</div>
+<div class="blueprint-frame" aria-hidden="true"></div>
+
+<header class="site-header">
+  <div class="header-inner">
+    <div class="title-block">
+      <span class="eyebrow">CPM · CRITICAL PATH METHOD</span>
+      <h1>ແຜນຄວບຄຸມວຽກກໍ່ສ້າງ</h1>
+      <p class="subtitle">161 Activities · ES / EF / LS / LF / TF · Network Diagram &amp; Gantt</p>
+    </div>
+    <div class="stat-strip" id="statStrip">
+      <div class="stat"><span class="stat-num" id="statTotal">—</span><span class="stat-label">ກິດຈະກຳ<br>Activities</span></div>
+      <div class="stat"><span class="stat-num" id="statDuration">—</span><span class="stat-label">ມື້ໂຄງການ<br>Project Days</span></div>
+      <div class="stat"><span class="stat-num stat-critical" id="statCritical">—</span><span class="stat-label">Critical Path<br>Activities</span></div>
+      <div class="stat"><span class="stat-num" id="statPhases">—</span><span class="stat-label">ໝວດ WBS<br>Phases</span></div>
+    </div>
   </div>
-  <div class="stats">
-    <div><b id="statTotal">—</b><span>Activities</span></div>
-    <div><b id="statDuration">—</b><span>Project Days</span></div>
-    <div><b class="red" id="statCritical">—</b><span>Critical</span></div>
-    <div><b id="statPhases">—</b><span>WBS</span></div>
-    <div><b id="statFinish">—</b><span>Finish</span></div>
-  </div>
+  <nav class="tab-nav" id="tabNav">
+    <button class="tab-btn active" data-tab="overview">ພາບລວມ<span>Overview</span></button>
+    <button class="tab-btn" data-tab="network">ຕາຂ່າຍ CPM<span>Network Diagram</span></button>
+    <button class="tab-btn" data-tab="gantt">ແຜນວັນທີ<span>Gantt</span></button>
+    <button class="tab-btn" data-tab="table">ຕາຕະລາງ<span>Table</span></button>
+  </nav>
 </header>
 
-<nav class="tabs">
-  <button class="tab active" data-tab="network">ພາບລວມ CPM<span>FULL NETWORK</span></button>
-  <button class="tab" data-tab="gantt">ແຜນວັນທີ<span>GANTT / CALENDAR</span></button>
-  <button class="tab" data-tab="table">ຕາຕະລາງ<span>ACTIVITY TABLE</span></button>
-</nav>
+<main id="app">
 
-<main>
-<section id="panel-network" class="panel active">
-  <div class="section-head">
-    <div>
-      <h2>CPM Network — ເບິ່ງທັງໂຄງການໃນ Diagram ດຽວ</h2>
-      <p>Activity ທັງ 161 ລາຍການຕໍ່ກັນຈາກ START → FINISH. ສີແດງ = Critical Path, ສີຟ້າ = Non-Critical.</p>
+  <!-- OVERVIEW -->
+  <section class="panel active" id="panel-overview">
+    <div class="panel-head">
+      <h2>ພາບລວມໂຄງການ <span>Project Phase Breakdown</span></h2>
+      <p class="panel-note">ໂຄງການທັງໝົດແມ່ນຕໍ່ເນື່ອງກັນເປັນລຳດັບດຽວ (single chain) — ທຸກກິດຈະກຳຈຶ່ງຢູ່ໃນ Critical Path (TF = 0). ຄລິກແຖບໝວດ ເພື່ອເບິ່ງລາຍລະອຽດ.</p>
     </div>
-    <div class="toolbar">
-      <input id="networkSearch" placeholder="ຄົ້ນຫາ Activity / Code">
-      <button id="criticalOnly">Critical Only</button>
-      <button id="fitNetwork">Fit to Screen</button>
-      <button id="zoomOut">−</button>
-      <span id="zoomLabel">100%</span>
-      <button id="zoomIn">+</button>
-    </div>
-  </div>
-  <div class="network-shell" id="networkShell">
-    <div class="network-stage" id="networkStage">
-      <svg id="networkSvg"></svg>
-      <div id="networkNodes"></div>
-    </div>
-  </div>
-  <div class="legend-bar">
-    <span><i class="line critical"></i>Critical Path</span>
-    <span><i class="line normal"></i>Non-Critical</span>
-    <span><i class="box summary"></i>WBS Phase</span>
-    <span>Node: ES · DUR · EF / Activity / LS · TF · LF</span>
-  </div>
-</section>
+    <div class="phase-timeline" id="phaseTimeline"></div>
+    <div class="phase-grid" id="phaseGrid"></div>
+  </section>
 
-<section id="panel-gantt" class="panel">
-  <div class="section-head">
-    <div>
-      <h2>Gantt Chart — ແບບ Microsoft Project</h2>
-      <p>ມີ Calendar, WBS Summary, Start/Finish, Predecessor, Resource ແລະ Dependency Lines.</p>
+  <!-- NETWORK -->
+  <section class="panel" id="panel-network">
+    <div class="panel-head">
+      <h2>ຕາຂ່າຍ CPM <span>Activity-on-Node Network — Critical Path Highlighted</span></h2>
+      <p class="panel-note">ແຕ່ລະໜ່ວຍ = ກິດຈະກຳໜຶ່ງ. ເສັ້ນສີແດງ = Critical Path (TF=0). ຄລິກໜ່ວຍໃດໜຶ່ງເພື່ອເບິ່ງ ES/EF/LS/LF/TF.</p>
     </div>
-    <div class="toolbar">
-      <input id="ganttSearch" placeholder="ຄົ້ນຫາ Task">
-      <select id="ganttScale">
-        <option value="day">Day</option>
-        <option value="week">Week</option>
-      </select>
-      <button id="collapseAll">Collapse WBS</button>
-      <button id="expandAll">Expand WBS</button>
-      <button id="scrollStart">Go to Start</button>
-      <button id="scrollFinish">Go to Finish</button>
-    </div>
-  </div>
-
-  <div class="project-grid">
-    <div class="task-pane">
-      <div class="task-header">
-        <div class="c-id">ID</div><div class="c-name">Task Name</div><div class="c-dur">Duration</div>
-        <div class="c-date">Start</div><div class="c-date">Finish</div><div class="c-pred">Predecessors</div><div class="c-res">Resource</div>
+    <div class="network-toolbar">
+      <input type="search" id="networkSearch" placeholder="ຄົ້ນຫາລະຫັດ ຫຼື ຊື່ວຽກ… / search code or name…">
+      <div class="zoom-controls">
+        <button id="zoomOut" title="Zoom out">−</button>
+        <span id="zoomLabel">100%</span>
+        <button id="zoomIn" title="Zoom in">+</button>
       </div>
-      <div id="taskRows"></div>
     </div>
-    <div class="timeline-pane" id="timelinePane">
-      <div class="calendar-header" id="calendarHeader"></div>
-      <div class="timeline-body" id="timelineBody"></div>
+    <div class="network-scroll" id="networkScroll">
+      <div class="network-canvas" id="networkCanvas"></div>
     </div>
-  </div>
+  </section>
 
-  <div class="gantt-footer">
-    <span>Project Start: <b id="footerStart"></b></span>
-    <span>Project Finish: <b id="footerFinish"></b></span>
-    <span>Total Duration: <b id="footerDuration"></b></span>
-    <span class="legend-mini"><i class="bar critical"></i>Critical</span>
-    <span class="legend-mini"><i class="bar normal"></i>Non-Critical</span>
-    <span class="legend-mini"><i class="bar summary"></i>Summary</span>
-  </div>
-</section>
+  <!-- GANTT -->
+  <section class="panel" id="panel-gantt">
+    <div class="panel-head">
+      <h2>ແຜນວັນທີ <span>Gantt Chart — Planned Calendar Dates</span></h2>
+      <p class="panel-note">ແຖບສີແດງ = ວຽກຢູ່ໃນ Critical Path. ເລື່ອນຂວາ-ຊ້າຍ ເພື່ອເບິ່ງທັງໝົດ.</p>
+    </div>
+    <div class="gantt-wrap" id="ganttWrap"></div>
+  </section>
 
-<section id="panel-table" class="panel">
-  <div class="section-head">
-    <div><h2>Activity Table</h2><p>ລາຍລະອຽດ CPM ທັງໝົດ</p></div>
-    <div class="toolbar"><input id="tableSearch" placeholder="Search"><button id="exportCsv">Export CSV</button></div>
-  </div>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>ID</th><th>Code</th><th>WBS</th><th>Activity</th><th>Dur</th><th>Start</th><th>Finish</th><th>Pred</th><th>Rel</th><th>ES</th><th>EF</th><th>LS</th><th>LF</th><th>TF</th><th>Critical</th><th>Resource</th></tr></thead>
-      <tbody id="activityTable"></tbody>
-    </table>
-  </div>
-</section>
+  <!-- TABLE -->
+  <section class="panel" id="panel-table">
+    <div class="panel-head">
+      <h2>ຕາຕະລາງກິດຈະກຳ <span>Full Activity Table — ES / EF / LS / LF / TF</span></h2>
+    </div>
+    <div class="table-toolbar">
+      <input type="search" id="tableSearch" placeholder="ຄົ້ນຫາລະຫັດ, ຊື່ວຽກ, ຜູ້ຮັບຜິດຊອບ… / search…">
+      <span class="table-count" id="tableCount"></span>
+    </div>
+    <div class="table-wrap">
+      <table id="dataTable">
+        <thead>
+          <tr>
+            <th data-key="id">#</th>
+            <th data-key="code">ລະຫັດ<br><small>Code</small></th>
+            <th data-key="name" class="th-name">ລາຍການວຽກ<br><small>Activity</small></th>
+            <th data-key="duration">ໄລຍະ<br><small>Dur</small></th>
+            <th data-key="pred">ກ່ອນໜ້າ<br><small>Pred</small></th>
+            <th data-key="rel"><small>Rel</small></th>
+            <th data-key="ES">ES</th>
+            <th data-key="EF">EF</th>
+            <th data-key="LS">LS</th>
+            <th data-key="LF">LF</th>
+            <th data-key="TF">TF</th>
+            <th data-key="critical">CP</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </section>
+
 </main>
 
-<aside id="drawer" class="drawer">
+<div class="detail-drawer" id="detailDrawer">
   <button class="drawer-close" id="drawerClose">×</button>
   <div id="drawerContent"></div>
-</aside>
+</div>
+<div class="drawer-scrim" id="drawerScrim"></div>
+
+<footer class="site-footer">
+  <span>Generated with the Critical Path Method — forward &amp; backward pass over 161 activities.</span>
+</footer>
 
 <script src="app.js"></script>
 </body>
