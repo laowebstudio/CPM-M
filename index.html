@@ -51,8 +51,8 @@
   <!-- NETWORK -->
   <section class="panel" id="panel-network">
     <div class="panel-head">
-      <h2>ຕາຂ່າຍ CPM <span>Activity-on-Node Network — Critical Path Highlighted</span></h2>
-      <p class="panel-note">ແຕ່ລະໜ່ວຍ = ກິດຈະກຳໜຶ່ງ. ເສັ້ນສີແດງ = Critical Path (TF=0). ຄລິກໜ່ວຍໃດໜຶ່ງເພື່ອເບິ່ງ ES/EF/LS/LF/TF.</p>
+      <h2>ຕາຂ່າຍ CPM <span>Activity-on-Node Network — Dependency Arrows, MS-Project style boxes</span></h2>
+      <p class="panel-note">ແຕ່ລະກ່ອງ = ກິດຈະກຳໜຶ່ງ (ID, ຊື່, Start/Finish, ES/EF/LS/LF). ລູກສອນເຊື່ອມ = ຄວາມສຳພັນກ່ອນໜ້າ-ຕໍ່ໄປ, ສີແດງ = Critical Path (TF=0). ຄລິກກ່ອງເພື່ອເບິ່ງລາຍລະອຽດ.</p>
     </div>
     <div class="network-toolbar">
       <input type="search" id="networkSearch" placeholder="ຄົ້ນຫາລະຫັດ ຫຼື ຊື່ວຽກ… / search code or name…">
@@ -62,6 +62,7 @@
         <button id="zoomIn" title="Zoom in">+</button>
       </div>
     </div>
+    <div class="network-legend" id="networkLegend"></div>
     <div class="network-scroll" id="networkScroll">
       <div class="network-canvas" id="networkCanvas"></div>
     </div>
@@ -70,8 +71,8 @@
   <!-- GANTT -->
   <section class="panel" id="panel-gantt">
     <div class="panel-head">
-      <h2>ແຜນວັນທີ <span>Gantt Chart — Planned Calendar Dates</span></h2>
-      <p class="panel-note">ແຖບສີແດງ = ວຽກຢູ່ໃນ Critical Path. ເລື່ອນຂວາ-ຊ້າຍ ເພື່ອເບິ່ງທັງໝົດ.</p>
+      <h2>ແຜນວັນທີ <span>Gantt Chart — Table + Timeline + Dependency Links</span></h2>
+      <p class="panel-note">ຄໍລໍາຊ້າຍ: ID/ລະຫັດ/ຊື່ວຽກ/ໄລຍະ/Start/Finish/Pred ຄືໃນ MS Project. ແຖບສີແດງ = Critical Path, ລາຍຈຸດ = ວັນເສົາ-ອາທິດ, ລູກສອນ = ຄວາມສຳພັນລະຫວ່າງວຽກ. ເລື່ອນຂວາ-ຊ້າຍ ເພື່ອເບິ່ງທັງໝົດ.</p>
     </div>
     <div class="gantt-wrap" id="ganttWrap"></div>
   </section>

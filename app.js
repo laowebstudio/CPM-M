@@ -1,8 +1,9 @@
 /* ==========================================================
    CPM Dashboard — vanilla JS, no build step, no dependencies
+   MS-Project style Network Diagram + detailed Gantt
    ========================================================== */
 
-let STATE = { data: null, activities: [], byId: {}, zoom: 1, sortKey: 'id', sortDir: 1 };
+let STATE = { data: null, activities: [], byId: {}, zoom: 1, sortKey: 'id', sortDir: 1, netLayout: null };
 
 const PHASE_COLORS = [
   '#7FB3D5', '#76C7B7', '#8FD19E', '#C9D97F', '#E8C15A',
@@ -15,28 +16,41 @@ function phaseColor(wbs) {
   return PHASE_COLORS[i];
 }
 
-fetch('data.json')
-  .then(r => r.json())
-  .then(json => {
-    STATE.data = json;
-    STATE.activities = json.activities;
-    json.activities.forEach(a => STATE.byId[a.id] = a);
-    init();
-  })
-  .catch(err => {
-    document.getElementById('app').innerHTML =
-      '<p style="padding:40px;color:#E9503F">ບໍ່ສາມາດໂຫຼດ data.json ໄດ້ / Could not load data.json — ' + err + '</p>';
-  });
+function bootstrap(json) {
+  STATE.data = json;
+  STATE.activities = json.activities;
+  json.activities.forEach(a => STATE.byId[a.id] = a);
+  init();
+}
+
+if (window.__EMBEDDED_DATA__) {
+  bootstrap(window.__EMBEDDED_DATA__);
+} else {
+  fetch('data.json')
+    .then(r => r.json())
+    .then(bootstrap)
+    .catch(err => {
+      document.getElementById('app').innerHTML =
+        '<p style="padding:40px;color:#E9503F">ບໍ່ສາມາດໂຫຼດ data.json ໄດ້ / Could not load data.json — ' + err + '</p>';
+    });
+}
 
 function init() {
   renderStats();
   renderTabs();
   renderOverview();
+  renderNetworkLegend();
   renderNetwork();
   renderGantt();
   renderTable();
   wireToolbars();
   wireDrawer();
+}
+
+/* ---------------- helpers ---------------- */
+function fmtShort(dateStr) {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 }
 
 /* ---------------- header stats ---------------- */
@@ -99,58 +113,149 @@ function renderOverview() {
 
 function jumpToPhase(wbs) {
   document.querySelector('.tab-btn[data-tab="network"]').click();
-  const el = document.querySelector('.net-phase-label[data-wbs="' + wbs + '"]');
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  requestAnimationFrame(() => {
+    const el = document.querySelector('.node[data-wbs="' + wbs + '"]');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+  });
 }
 
-/* ---------------- network diagram (AON snake layout) ---------------- */
-const NODES_PER_ROW = 10;
+/* ---------------- network diagram: MS-Project-style AON tree layout ---------------- */
+const NET_COL_W = 214;   // px per depth column
+const NET_ROW_H = 92;    // px per sibling slot
+const NET_BOX_W = 182;
+const NET_PAD = 26;
+
+function buildNetTree(acts) {
+  const children = {};
+  acts.forEach(a => { children[a.id] = []; });
+  let root = null;
+  acts.forEach(a => {
+    if (a.pred) children[a.pred].push(a.id);
+    else root = a.id;
+  });
+  return { children, root };
+}
+
+function computeNetLayout(acts) {
+  const { children, root } = buildNetTree(acts);
+  const depth = {};
+  const yPos = {};
+  let nextSlot = 0;
+
+  (function calcDepth(id, d) {
+    depth[id] = d;
+    children[id].forEach(c => calcDepth(c, d + 1));
+  })(root, 0);
+
+  function assignY(id) {
+    const kids = children[id];
+    if (kids.length === 0) {
+      yPos[id] = nextSlot;
+      nextSlot += 1;
+      return yPos[id];
+    }
+    const ys = kids.map(assignY);
+    yPos[id] = (Math.min.apply(null, ys) + Math.max.apply(null, ys)) / 2;
+    return yPos[id];
+  }
+  assignY(root);
+
+  const depths = Object.values(depth);
+  return { children, depth, yPos, maxDepth: Math.max.apply(null, depths), maxSlot: nextSlot - 1 };
+}
+
+function renderNetworkLegend() {
+  const el = document.getElementById('networkLegend');
+  if (!el) return;
+  const phases = STATE.data.meta.phases;
+  let html = '<div class="legend-group"><span class="legend-title">ເສັ້ນເຊື່ອມ / Links:</span>' +
+    '<span class="legend-item"><i class="lg-line lg-cp"></i>Critical dependency</span>' +
+    '<span class="legend-item"><i class="lg-line lg-nc"></i>Non-critical dependency</span></div>';
+  html += '<div class="legend-group"><span class="legend-title">WBS Phase:</span>';
+  phases.forEach(p => {
+    html += '<span class="legend-item"><i class="lg-dot" style="background:' + phaseColor(p.wbs) + '"></i>' + p.wbs + '</span>';
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
 
 function renderNetwork() {
   const canvas = document.getElementById('networkCanvas');
   canvas.innerHTML = '';
   const acts = STATE.activities;
+  const layout = computeNetLayout(acts);
+  STATE.netLayout = layout;
 
-  // group runs by phase, then chunk into rows, snaking direction each row
-  let rowIndex = 0;
-  let currentPhase = null;
-  let rowDiv = null;
-  let inRow = 0;
+  const width = (layout.maxDepth + 1) * NET_COL_W + NET_PAD * 2;
+  const height = (layout.maxSlot + 1) * NET_ROW_H + NET_PAD * 2;
+  canvas.style.width = width + 'px';
+  canvas.style.height = height + 'px';
+  canvas.style.position = 'relative';
 
-  acts.forEach((a, i) => {
-    if (a.wbs !== currentPhase) {
-      currentPhase = a.wbs;
-      const phaseName = STATE.data.meta.phases.find(p => p.wbs === a.wbs).name;
-      const label = document.createElement('div');
-      label.className = 'net-phase-label';
-      label.dataset.wbs = a.wbs;
-      label.textContent = 'WBS ' + a.wbs + ' · ' + phaseName;
-      canvas.appendChild(label);
-      rowIndex = 0;
-      inRow = NODES_PER_ROW; // force new row
-    }
+  function anchor(id) {
+    const d = layout.depth[id], y = layout.yPos[id];
+    const left = NET_PAD + d * NET_COL_W;
+    const top = NET_PAD + y * NET_ROW_H;
+    return { left: left, top: top, cx: left + NET_BOX_W, cy: top + 39, lx: left };
+  }
 
-    if (inRow >= NODES_PER_ROW) {
-      rowDiv = document.createElement('div');
-      rowDiv.className = 'net-row' + (rowIndex % 2 === 1 ? ' reverse' : '');
-      canvas.appendChild(rowDiv);
-      rowIndex++;
-      inRow = 0;
-    }
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('class', 'net-edges');
+  svg.setAttribute('width', width);
+  svg.setAttribute('height', height);
+  svg.innerHTML =
+    '<defs>' +
+      '<marker id="arrowCyan" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">' +
+        '<path d="M0,0 L6,3 L0,6 Z" fill="#4A7FA7"/></marker>' +
+      '<marker id="arrowRed" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">' +
+        '<path d="M0,0 L6,3 L0,6 Z" fill="#E9503F"/></marker>' +
+    '</defs>';
 
+  acts.forEach(a => {
+    (a.successors || []).forEach(sid => {
+      const s = STATE.byId[sid];
+      const p1 = anchor(a.id), p2 = anchor(sid);
+      const bothCritical = a.critical && s.critical;
+      const midX = p1.cx + Math.max((p2.lx - p1.cx) / 2, 10);
+      const d = 'M ' + p1.cx + ',' + p1.cy + ' L ' + midX + ',' + p1.cy +
+                ' L ' + midX + ',' + p2.cy + ' L ' + (p2.lx - 2) + ',' + p2.cy;
+      const path = document.createElementNS(svgNS, 'path');
+      path.setAttribute('d', d);
+      path.setAttribute('class', 'net-edge' + (bothCritical ? ' critical' : ''));
+      path.setAttribute('marker-end', bothCritical ? 'url(#arrowRed)' : 'url(#arrowCyan)');
+      svg.appendChild(path);
+    });
+  });
+  canvas.appendChild(svg);
+
+  const frag = document.createDocumentFragment();
+  acts.forEach(a => {
+    const p = anchor(a.id);
     const node = document.createElement('div');
     node.className = 'node' + (a.critical ? ' critical' : '');
+    node.style.left = p.left + 'px';
+    node.style.top = p.top + 'px';
+    node.style.borderTopColor = phaseColor(a.wbs);
     node.dataset.id = a.id;
     node.dataset.code = a.code;
     node.dataset.name = a.name;
+    node.dataset.wbs = a.wbs;
     node.innerHTML =
-      '<div class="n-code"><span>' + a.code + '</span><span>' + a.duration + 'd</span></div>' +
+      '<div class="n-head">' +
+        '<span class="n-code">' + a.code + '</span>' +
+        (a.critical ? '<span class="n-flag n-flag-cp">CP</span>' : '<span class="n-flag">TF ' + a.TF + '</span>') +
+      '</div>' +
       '<div class="n-name">' + a.name + '</div>' +
-      '<div class="n-metrics"><span>ES <b>' + a.ES + '</b></span><span>TF <b>' + a.TF + '</b></span><span>EF <b>' + a.EF + '</b></span></div>';
+      '<div class="n-dates"><span>' + fmtShort(a.plan_start) + '→' + fmtShort(a.plan_end) + '</span><span>' + a.duration + 'd</span></div>' +
+      '<div class="n-metrics">' +
+        '<span>ES<b>' + a.ES + '</b></span><span>EF<b>' + a.EF + '</b></span>' +
+        '<span>LS<b>' + a.LS + '</b></span><span>LF<b>' + a.LF + '</b></span>' +
+      '</div>';
     node.addEventListener('click', () => openDrawer(a.id));
-    rowDiv.appendChild(node);
-    inRow++;
+    frag.appendChild(node);
   });
+  canvas.appendChild(frag);
 
   applyZoom();
 }
@@ -160,7 +265,12 @@ function applyZoom() {
   document.getElementById('zoomLabel').textContent = Math.round(STATE.zoom * 100) + '%';
 }
 
-/* ---------------- gantt ---------------- */
+/* ---------------- gantt: MS-Project style table + timeline + link arrows ---------------- */
+const G_COLS = [34, 58, 232, 40, 66, 66, 78]; // id, code, name, dur, start, finish, pred
+const G_LABEL_W = G_COLS.reduce((s, w) => s + w, 0) + 6 * 6 + 20; // widths + column-gaps + padding
+const G_ROW_H = 30;
+const G_DAY_W = 9;
+
 function renderGantt() {
   const wrap = document.getElementById('ganttWrap');
   wrap.innerHTML = '';
@@ -169,64 +279,183 @@ function renderGantt() {
   const minDate = new Date(STATE.data.meta.start_date);
   const maxDate = new Date(STATE.data.meta.end_date);
   const totalDays = Math.round((maxDate - minDate) / 86400000) + 1;
-  const dayWidth = 8; // px per day
-  const chartWidth = totalDays * dayWidth;
+  const chartWidth = totalDays * G_DAY_W;
 
-  // month header
-  const header = document.createElement('div');
-  header.className = 'gantt-row gantt-header';
-  const headerLabel = document.createElement('div');
-  headerLabel.className = 'gantt-label';
-  headerLabel.textContent = 'ກິດຈະກຳ / Activity';
-  header.appendChild(headerLabel);
-  const headerTrack = document.createElement('div');
-  headerTrack.className = 'gantt-track';
-  headerTrack.style.width = chartWidth + 'px';
-  headerTrack.style.height = 'auto';
+  wrap.style.setProperty('--g-label-w', G_LABEL_W + 'px');
 
+  wrap.appendChild(buildGanttHeader(minDate, maxDate, totalDays, chartWidth));
+
+  const body = document.createElement('div');
+  body.className = 'gantt-body';
+
+  const overlay = document.createElement('div');
+  overlay.className = 'gantt-bg-overlay';
+  overlay.style.width = chartWidth + 'px';
+  overlay.style.height = (acts.length * G_ROW_H) + 'px';
   let cursor = new Date(minDate);
-  while (cursor <= maxDate) {
+  for (let i = 0; i < totalDays; i++) {
+    const dow = cursor.getDay();
+    if (dow === 0 || dow === 6) {
+      const stripe = document.createElement('div');
+      stripe.className = 'wk-stripe';
+      stripe.style.left = (i * G_DAY_W) + 'px';
+      stripe.style.width = G_DAY_W + 'px';
+      overlay.appendChild(stripe);
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  body.appendChild(overlay);
+
+  const rowsFrag = document.createDocumentFragment();
+  acts.forEach((a, i) => rowsFrag.appendChild(buildGanttRow(a, minDate, chartWidth)));
+  body.appendChild(rowsFrag);
+
+  body.appendChild(buildGanttLinks(acts, minDate, chartWidth));
+
+  wrap.appendChild(body);
+}
+
+function ganttLabelGrid(cells, extraClass) {
+  const el = document.createElement('div');
+  el.className = 'gantt-label' + (extraClass ? ' ' + extraClass : '');
+  el.innerHTML = cells.map((c, i) => '<span class="gl-c gl-' + i + '">' + c + '</span>').join('');
+  return el;
+}
+
+function buildGanttHeader(minDate, maxDate, totalDays, chartWidth) {
+  const header = document.createElement('div');
+  header.className = 'gantt-header';
+  header.appendChild(ganttLabelGrid(
+    ['ID', 'ລະຫັດ<br>Code', 'ກິດຈະກຳ / Task Name', 'ໄລຍະ<br>Dur', 'ເລີ່ມ<br>Start', 'ສິ້ນສຸດ<br>Finish', 'ກ່ອນໜ້າ<br>Pred'],
+    'gantt-label-head'
+  ));
+
+  const trackHead = document.createElement('div');
+  trackHead.className = 'gantt-track-head';
+  trackHead.style.width = chartWidth + 'px';
+
+  const monthRow = document.createElement('div');
+  monthRow.className = 'gantt-months';
+  let cursor = new Date(minDate);
+  const rangeEndExclusive = new Date(maxDate.getTime() + 86400000);
+  while (cursor < rangeEndExclusive) {
     const monthStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
     const nextMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
     const segStart = cursor > monthStart ? cursor : monthStart;
-    const segEnd = nextMonth < maxDate ? nextMonth : new Date(maxDate.getTime() + 86400000);
+    const segEnd = nextMonth < rangeEndExclusive ? nextMonth : rangeEndExclusive;
     const days = Math.round((segEnd - segStart) / 86400000);
     const m = document.createElement('div');
     m.className = 'gantt-month';
-    m.style.width = (days * dayWidth) + 'px';
-    m.textContent = segStart.toLocaleString('en-US', { month: 'short', year: '2-digit' });
-    headerTrack.appendChild(m);
+    m.style.width = (days * G_DAY_W) + 'px';
+    m.textContent = segStart.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    monthRow.appendChild(m);
     cursor = nextMonth;
   }
-  header.appendChild(headerTrack);
-  wrap.appendChild(header);
+
+  const weekRow = document.createElement('div');
+  weekRow.className = 'gantt-weeks';
+  for (let d = 0; d < totalDays; d += 7) {
+    const remain = Math.min(7, totalDays - d);
+    const w = document.createElement('div');
+    w.className = 'gantt-week';
+    w.style.width = (remain * G_DAY_W) + 'px';
+    const wd = new Date(minDate);
+    wd.setDate(wd.getDate() + d);
+    w.textContent = fmtShort(wd.toISOString().slice(0, 10));
+    weekRow.appendChild(w);
+  }
+
+  trackHead.appendChild(monthRow);
+  trackHead.appendChild(weekRow);
+  header.appendChild(trackHead);
+  return header;
+}
+
+function buildGanttRow(a, minDate, chartWidth) {
+  const row = document.createElement('div');
+  row.className = 'gantt-row' + (a.critical ? ' is-critical' : '');
+
+  const predLabel = a.pred ? (STATE.byId[a.pred].code + (a.rel ? ' (' + a.rel + ')' : '')) : '—';
+  const label = ganttLabelGrid([
+    a.id,
+    a.code,
+    '<span class="gl-name-text" title="' + a.name.replace(/"/g, '&quot;') + '">' + a.name + '</span>',
+    a.duration + 'd',
+    fmtShort(a.plan_start),
+    fmtShort(a.plan_end),
+    predLabel
+  ]);
+  row.appendChild(label);
+
+  const track = document.createElement('div');
+  track.className = 'gantt-track';
+  track.style.width = chartWidth + 'px';
+
+  const offsetDays = Math.round((new Date(a.plan_start) - minDate) / 86400000);
+  const bar = document.createElement('div');
+  bar.className = 'gantt-bar' + (a.critical ? ' critical' : '');
+  bar.style.left = (offsetDays * G_DAY_W) + 'px';
+  bar.style.width = Math.max(a.duration * G_DAY_W - 2, 5) + 'px';
+  if (!a.critical) bar.style.background = phaseColor(a.wbs);
+  bar.title = a.code + ' ' + a.name + ' (' + a.plan_start + ' → ' + a.plan_end + ')';
+  bar.addEventListener('click', () => openDrawer(a.id));
+
+  const barLabel = document.createElement('span');
+  barLabel.className = 'gb-label';
+  barLabel.textContent = a.duration + 'd · TF' + a.TF;
+  bar.appendChild(barLabel);
+
+  track.appendChild(bar);
+  row.appendChild(track);
+  return row;
+}
+
+function buildGanttLinks(acts, minDate, chartWidth) {
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('class', 'gantt-links');
+  const totalH = acts.length * G_ROW_H;
+  svg.setAttribute('width', chartWidth);
+  svg.setAttribute('height', totalH);
+  svg.innerHTML =
+    '<defs>' +
+      '<marker id="gArrowCyan" markerWidth="7" markerHeight="7" refX="5" refY="2.5" orient="auto">' +
+        '<path d="M0,0 L5,2.5 L0,5 Z" fill="#4A7FA7"/></marker>' +
+      '<marker id="gArrowRed" markerWidth="7" markerHeight="7" refX="5" refY="2.5" orient="auto">' +
+        '<path d="M0,0 L5,2.5 L0,5 Z" fill="#E9503F"/></marker>' +
+    '</defs>';
+
+  const idx = {};
+  acts.forEach((a, i) => { idx[a.id] = i; });
 
   acts.forEach(a => {
-    const row = document.createElement('div');
-    row.className = 'gantt-row';
+    if (!a.pred) return;
+    const p = STATE.byId[a.pred];
+    const pi = idx[p.id], ci = idx[a.id];
+    const pOffset = Math.round((new Date(p.plan_start) - minDate) / 86400000);
+    const cOffset = Math.round((new Date(a.plan_start) - minDate) / 86400000);
+    const rel = a.rel || 'FS';
+    const x1 = (rel === 'SS' ? pOffset : (pOffset + p.duration)) * G_DAY_W;
+    const y1 = pi * G_ROW_H + G_ROW_H / 2;
+    const x2 = cOffset * G_DAY_W;
+    const y2 = ci * G_ROW_H + G_ROW_H / 2;
+    const bothCrit = p.critical && a.critical;
 
-    const label = document.createElement('div');
-    label.className = 'gantt-label';
-    label.innerHTML = '<span class="g-code">' + a.code + '</span><span class="g-name">' + a.name + '</span>';
-    row.appendChild(label);
-
-    const track = document.createElement('div');
-    track.className = 'gantt-track';
-    track.style.width = chartWidth + 'px';
-
-    const offsetDays = Math.round((new Date(a.plan_start) - minDate) / 86400000);
-    const bar = document.createElement('div');
-    bar.className = 'gantt-bar' + (a.critical ? ' critical' : '');
-    bar.style.left = (offsetDays * dayWidth) + 'px';
-    bar.style.width = Math.max(a.duration * dayWidth - 2, 4) + 'px';
-    bar.style.background = a.critical ? undefined : phaseColor(a.wbs);
-    bar.title = a.code + ' ' + a.name + ' (' + a.plan_start + ' → ' + a.plan_end + ')';
-    bar.addEventListener('click', () => openDrawer(a.id));
-    track.appendChild(bar);
-
-    row.appendChild(track);
-    wrap.appendChild(row);
+    let d;
+    if (y1 === y2) {
+      d = 'M ' + x1 + ',' + y1 + ' L ' + (x2 - 3) + ',' + y2;
+    } else {
+      const midX = x1 + 9;
+      d = 'M ' + x1 + ',' + y1 + ' L ' + midX + ',' + y1 + ' L ' + midX + ',' + y2 + ' L ' + (x2 - 3) + ',' + y2;
+    }
+    const path = document.createElementNS(svgNS, 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('class', 'g-link' + (bothCrit ? ' critical' : ''));
+    path.setAttribute('marker-end', bothCrit ? 'url(#gArrowRed)' : 'url(#gArrowCyan)');
+    svg.appendChild(path);
   });
+
+  return svg;
 }
 
 /* ---------------- table ---------------- */
@@ -291,7 +520,7 @@ function wireToolbars() {
   });
 
   document.getElementById('zoomIn').addEventListener('click', () => { STATE.zoom = Math.min(STATE.zoom + 0.15, 1.6); applyZoom(); });
-  document.getElementById('zoomOut').addEventListener('click', () => { STATE.zoom = Math.max(STATE.zoom - 0.15, 0.4); applyZoom(); });
+  document.getElementById('zoomOut').addEventListener('click', () => { STATE.zoom = Math.max(STATE.zoom - 0.15, 0.3); applyZoom(); });
 
   document.getElementById('tableSearch').addEventListener('input', e => renderTable(e.target.value));
 
