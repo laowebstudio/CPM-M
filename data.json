@@ -60,8 +60,9 @@
     ],
     "start_date": "2026-09-01",
     "end_date": "2026-12-15",
-    "version": "V2.1.0 Accelerated",
-    "source": "Project-Management-V1.3-Accelerated-Parallel.xlsx"
+    "version": "V3.0.0",
+    "source": "Project-Management-V1.3-Accelerated-Parallel.xlsx",
+    "ui": "Full Connected Network + Microsoft Project Style Gantt"
   },
   "activities": [
     {

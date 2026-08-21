@@ -1,15 +1,14 @@
-# CPM Dashboard V2.1.0 — Accelerated Parallel Plan
+# CPM Dashboard V3.0.0
 
-GitHub Pages-ready static website.
+Based on CPM-DIAGRAM V2.1.0 Accelerated GitHub and its 161-activity accelerated schedule.
 
-Source schedule: `Project-Management-V1.3-Accelerated-Parallel.xlsx`
+## V3 changes
+- Full connected CPM network in one continuous diagram from START to FINISH.
+- WBS phases shown as columns, with all activity dependency arrows.
+- Fit-to-screen, zoom, search, and Critical Only controls.
+- Microsoft Project-style Gantt view.
+- Calendar header by month/day, weekend shading, WBS summary rows, Start/Finish/Predecessor/Resource columns.
+- Collapsible WBS groups, day/week scale, synchronized table/timeline scrolling.
+- GitHub Pages ready: upload all root files directly to the repository root.
 
-- 161 activities
-- Project duration: 106 days
-- Planned period: 2026-09-01 to 2026-12-15
-- Critical activities: 76
-- Uses FS / SS relationships from the latest Excel schedule
-- Overview, CPM Network Diagram, Gantt, Table, Activity detail drawer
-- `index.html`, `app.js`, `data.json`, and `style.css` are at repository root
-
-Upload the files directly to the root of the GitHub repository configured for Pages.
+Project schedule: 01/09/2026 → 15/12/2026, 106 days, 161 activities.
