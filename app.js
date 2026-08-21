@@ -71,9 +71,9 @@ function renderOverview() {
 
   phases.forEach(p => {
     const acts = STATE.activities.filter(a => a.wbs === p.wbs);
-    const days = acts.reduce((s, a) => s + a.duration, 0);
     const start = acts.reduce((min, a) => a.plan_start < min ? a.plan_start : min, acts[0].plan_start);
     const end = acts.reduce((max, a) => a.plan_end > max ? a.plan_end : max, acts[0].plan_end);
+    const days = Math.round((new Date(end) - new Date(start)) / 86400000) + 1;
     const widthPct = Math.max((days / totalDur) * 100, 2.2);
 
     const seg = document.createElement('div');
