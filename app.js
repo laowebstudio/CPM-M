@@ -120,9 +120,15 @@ function jumpToPhase(wbs) {
 }
 
 /* ---------------- network diagram: MS-Project-style AON tree layout ---------------- */
+/* Node card mimics the classic "Critical Path Diagram Template":
+   ES | DUR | EF   (yellow-green / green)
+   ----- CODE -----  (white)
+   LS | TF | LF    (cyan / teal)
+   ----- name -----  (extra strip, kept for readability of real task names)      */
 const NET_COL_W = 214;   // px per depth column
-const NET_ROW_H = 92;    // px per sibling slot
-const NET_BOX_W = 182;
+const NET_ROW_H = 128;   // px per sibling slot
+const NET_BOX_W = 184;
+const NET_BOX_H = 108;
 const NET_PAD = 26;
 
 function buildNetTree(acts) {
@@ -167,15 +173,15 @@ function computeNetLayout(acts) {
 function renderNetworkLegend() {
   const el = document.getElementById('networkLegend');
   if (!el) return;
-  const phases = STATE.data.meta.phases;
-  let html = '<div class="legend-group"><span class="legend-title">ເສັ້ນເຊື່ອມ / Links:</span>' +
-    '<span class="legend-item"><i class="lg-line lg-cp"></i>Critical dependency</span>' +
-    '<span class="legend-item"><i class="lg-line lg-nc"></i>Non-critical dependency</span></div>';
-  html += '<div class="legend-group"><span class="legend-title">WBS Phase:</span>';
-  phases.forEach(p => {
-    html += '<span class="legend-item"><i class="lg-dot" style="background:' + phaseColor(p.wbs) + '"></i>' + p.wbs + '</span>';
-  });
-  html += '</div>';
+  let html = '<div class="legend-group"><span class="legend-title">ລູກສອນ / Arrows:</span>' +
+    '<span class="legend-item"><i class="lg-line lg-cp"></i>Critical path</span>' +
+    '<span class="legend-item"><i class="lg-line lg-nc"></i>Non-critical link</span></div>';
+  html += '<div class="legend-group"><span class="legend-title">Card:</span>' +
+    '<span class="legend-item"><i class="lg-swatch" style="background:#C7DA6B"></i>ES / EF</span>' +
+    '<span class="legend-item"><i class="lg-swatch" style="background:#4FAE86"></i>DUR</span>' +
+    '<span class="legend-item"><i class="lg-swatch" style="background:#79DAD1"></i>LS / LF</span>' +
+    '<span class="legend-item"><i class="lg-swatch" style="background:#3E9C93"></i>TF</span>' +
+    '<span class="legend-item"><i class="lg-swatch" style="background:#F4F8FB;border:1px solid #999"></i>Task ID</span></div>';
   el.innerHTML = html;
 }
 
@@ -196,7 +202,7 @@ function renderNetwork() {
     const d = layout.depth[id], y = layout.yPos[id];
     const left = NET_PAD + d * NET_COL_W;
     const top = NET_PAD + y * NET_ROW_H;
-    return { left: left, top: top, cx: left + NET_BOX_W, cy: top + 39, lx: left };
+    return { left: left, top: top, cx: left + NET_BOX_W, cy: top + NET_BOX_H / 2, lx: left };
   }
 
   const svgNS = 'http://www.w3.org/2000/svg';
@@ -206,10 +212,10 @@ function renderNetwork() {
   svg.setAttribute('height', height);
   svg.innerHTML =
     '<defs>' +
-      '<marker id="arrowCyan" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">' +
-        '<path d="M0,0 L6,3 L0,6 Z" fill="#4A7FA7"/></marker>' +
-      '<marker id="arrowRed" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">' +
-        '<path d="M0,0 L6,3 L0,6 Z" fill="#E9503F"/></marker>' +
+      '<marker id="arrowNeutral" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">' +
+        '<path d="M0,0 L7,3.5 L0,7 Z" fill="#B9C7D6"/></marker>' +
+      '<marker id="arrowRed" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">' +
+        '<path d="M0,0 L7,3.5 L0,7 Z" fill="#E9503F"/></marker>' +
     '</defs>';
 
   acts.forEach(a => {
@@ -223,7 +229,7 @@ function renderNetwork() {
       const path = document.createElementNS(svgNS, 'path');
       path.setAttribute('d', d);
       path.setAttribute('class', 'net-edge' + (bothCritical ? ' critical' : ''));
-      path.setAttribute('marker-end', bothCritical ? 'url(#arrowRed)' : 'url(#arrowCyan)');
+      path.setAttribute('marker-end', bothCritical ? 'url(#arrowRed)' : 'url(#arrowNeutral)');
       svg.appendChild(path);
     });
   });
@@ -236,22 +242,27 @@ function renderNetwork() {
     node.className = 'node' + (a.critical ? ' critical' : '');
     node.style.left = p.left + 'px';
     node.style.top = p.top + 'px';
-    node.style.borderTopColor = phaseColor(a.wbs);
     node.dataset.id = a.id;
     node.dataset.code = a.code;
     node.dataset.name = a.name;
     node.dataset.wbs = a.wbs;
     node.innerHTML =
-      '<div class="n-head">' +
-        '<span class="n-code">' + a.code + '</span>' +
-        (a.critical ? '<span class="n-flag n-flag-cp">CP</span>' : '<span class="n-flag">TF ' + a.TF + '</span>') +
+      '<div class="n-row3 n-top">' +
+        '<span class="n-es">' + a.ES + '</span>' +
+        '<span class="n-dur">' + a.duration + '</span>' +
+        '<span class="n-ef">' + a.EF + '</span>' +
       '</div>' +
-      '<div class="n-name">' + a.name + '</div>' +
-      '<div class="n-dates"><span>' + fmtShort(a.plan_start) + '→' + fmtShort(a.plan_end) + '</span><span>' + a.duration + 'd</span></div>' +
-      '<div class="n-metrics">' +
-        '<span>ES<b>' + a.ES + '</b></span><span>EF<b>' + a.EF + '</b></span>' +
-        '<span>LS<b>' + a.LS + '</b></span><span>LF<b>' + a.LF + '</b></span>' +
-      '</div>';
+      '<div class="n-id">' +
+        '<span class="n-id-wbs" style="background:' + phaseColor(a.wbs) + '"></span>' +
+        '<span>' + a.code + '</span>' +
+        (a.critical ? '<span class="n-flag-cp">CP</span>' : '') +
+      '</div>' +
+      '<div class="n-row3 n-bot">' +
+        '<span class="n-ls">' + a.LS + '</span>' +
+        '<span class="n-tf">' + a.TF + '</span>' +
+        '<span class="n-lf">' + a.LF + '</span>' +
+      '</div>' +
+      '<div class="n-name">' + a.name + '</div>';
     node.addEventListener('click', () => openDrawer(a.id));
     frag.appendChild(node);
   });

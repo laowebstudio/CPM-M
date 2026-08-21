@@ -352,8 +352,9 @@ input[type="search"]:focus { border-color: var(--line-cyan); }
 .legend-item { display: flex; align-items: center; gap: 5px; }
 .lg-line { display: inline-block; width: 20px; height: 0; border-top: 2px solid var(--line-cyan); }
 .lg-line.lg-cp { border-top-color: var(--accent-red); }
-.lg-line.lg-nc { border-top-color: var(--line-cyan); }
+.lg-line.lg-nc { border-top-color: #B9C7D6; }
 .lg-dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; }
+.lg-swatch { display: inline-block; width: 13px; height: 13px; border-radius: 2px; }
 
 .network-scroll {
   border: 1px solid var(--line-dim);
@@ -381,75 +382,91 @@ input[type="search"]:focus { border-color: var(--line-cyan); }
 }
 .net-edge {
   fill: none;
-  stroke: var(--line-cyan);
-  stroke-width: 1.5;
+  stroke: #B9C7D6;
+  stroke-width: 1.6;
+  opacity: .8;
 }
 .net-edge.critical {
   stroke: var(--accent-red);
-  stroke-width: 2;
+  stroke-width: 2.4;
+  opacity: 1;
 }
 
-/* MS-Project style task box: header / name / dates / ES-EF-LS-LF grid */
+/* Node card — "Critical Path Diagram Template" layout:
+   ES | DUR | EF  ·  CODE  ·  LS | TF | LF  ·  name strip */
 .node {
   position: absolute;
-  width: 182px;
-  background: var(--navy);
-  border: 1.5px solid var(--line-cyan);
-  border-top-width: 4px;
-  border-radius: 4px;
-  padding: 6px 8px 7px;
+  width: 184px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--navy-light);
+  border: 1.5px solid var(--line-dim);
   cursor: pointer;
   font-family: var(--font-mono);
-  transition: transform .1s ease, border-color .1s ease, box-shadow .1s ease;
+  transition: transform .1s ease, box-shadow .1s ease, border-color .1s ease;
   z-index: 2;
+  box-shadow: 0 1px 4px rgba(0,0,0,.25);
 }
 
-.node:hover { transform: translateY(-2px) scale(1.01); border-color: var(--paper); z-index: 5; box-shadow: 0 6px 18px rgba(0,0,0,.35); }
+.node:hover { transform: translateY(-2px) scale(1.015); box-shadow: 0 8px 20px rgba(0,0,0,.4); z-index: 6; }
 
-.node.critical { border-color: var(--accent-red); background: linear-gradient(180deg, rgba(233,80,63,0.14), var(--navy)); }
-.node.critical { border-top-color: var(--accent-red) !important; }
+.node.critical { border-color: var(--accent-red); box-shadow: 0 0 0 1px var(--accent-red); }
+.node.critical:hover { box-shadow: 0 0 0 1px var(--accent-red), 0 8px 20px rgba(0,0,0,.4); }
 
-.node.dim { opacity: 0.18; }
-.node.match { border-color: var(--accent-amber); box-shadow: 0 0 0 2px var(--accent-amber); z-index: 4; }
+.node.dim { opacity: 0.16; }
+.node.match { box-shadow: 0 0 0 2px var(--accent-amber); z-index: 5; }
 
-.node .n-head { font-size: 10.5px; color: var(--accent-amber); display: flex; justify-content: space-between; align-items: center; }
-.node .n-flag {
-  font-size: 8.5px;
+.n-row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; }
+.n-row3 span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #0B2036;
+}
+.n-top .n-es, .n-top .n-ef { background: #C7DA6B; }
+.n-top .n-dur { background: #4FAE86; color: #06251A; }
+.n-bot .n-ls, .n-bot .n-lf { background: #79DAD1; }
+.n-bot .n-tf { background: #3E9C93; color: #052420; }
+
+.n-id {
+  background: #F4F8FB;
+  color: #0B2036;
+  font-weight: 800;
+  text-align: center;
+  padding: 4px 8px;
+  font-size: 12px;
+  letter-spacing: .02em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.n-id-wbs { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+.n-flag-cp {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
+  background: var(--accent-red);
+  color: #fff;
   padding: 1px 5px;
   border-radius: 3px;
-  background: var(--navy-light);
-  color: var(--paper-dim);
 }
-.node .n-flag-cp { background: var(--accent-red-dim); color: var(--accent-red); }
 
-.node .n-name {
+.n-name {
   font-family: var(--font-body);
-  font-size: 10.5px;
-  color: var(--paper);
+  font-size: 9.5px;
+  color: var(--paper-dim);
+  background: var(--navy);
+  padding: 5px 8px 6px;
   line-height: 1.25;
-  margin: 4px 0 5px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  min-height: 26px;
 }
-.node .n-dates {
-  display: flex;
-  justify-content: space-between;
-  font-size: 9px;
-  color: var(--line-cyan);
-  padding-top: 4px;
-  border-top: 1px dashed var(--line-dim);
-  margin-bottom: 3px;
-}
-.node .n-metrics {
-  display: flex;
-  justify-content: space-between;
-  font-size: 8.5px;
-  color: var(--paper-dim);
-}
-.node .n-metrics b { color: var(--paper); margin-left: 2px; }
 
 /* ---------------- gantt (MS-Project style table + timeline) ---------------- */
 .gantt-wrap {
