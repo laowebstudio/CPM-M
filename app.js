@@ -174,8 +174,9 @@ function renderNetworkLegend() {
   const el = document.getElementById('networkLegend');
   if (!el) return;
   let html = '<div class="legend-group"><span class="legend-title">ລູກສອນ / Arrows:</span>' +
-    '<span class="legend-item"><i class="lg-line lg-cp"></i>Critical path</span>' +
-    '<span class="legend-item"><i class="lg-line lg-nc"></i>Non-critical link</span></div>';
+    '<span class="legend-item"><i class="lg-line lg-cp"></i>Critical path (FS)</span>' +
+    '<span class="legend-item"><i class="lg-line lg-nc"></i>Non-critical (FS)</span>' +
+    '<span class="legend-item"><i class="lg-line lg-dummy"></i>Dummy link (SS · zero-lag, logical tie)</span></div>';
   html += '<div class="legend-group"><span class="legend-title">Card:</span>' +
     '<span class="legend-item"><i class="lg-swatch" style="background:#C7DA6B"></i>ES / EF</span>' +
     '<span class="legend-item"><i class="lg-swatch" style="background:#4FAE86"></i>DUR</span>' +
@@ -223,12 +224,16 @@ function renderNetwork() {
       const s = STATE.byId[sid];
       const p1 = anchor(a.id), p2 = anchor(sid);
       const bothCritical = a.critical && s.critical;
+      const isDummy = s.rel === 'SS';
       const midX = p1.cx + Math.max((p2.lx - p1.cx) / 2, 10);
+      // dummy (SS) links tie the *start* of the successor, not its own left edge from the pred's finish —
+      // draw them dropping straight down/up into the successor's left edge to read as a zero-lag logical tie
       const d = 'M ' + p1.cx + ',' + p1.cy + ' L ' + midX + ',' + p1.cy +
                 ' L ' + midX + ',' + p2.cy + ' L ' + (p2.lx - 2) + ',' + p2.cy;
       const path = document.createElementNS(svgNS, 'path');
       path.setAttribute('d', d);
-      path.setAttribute('class', 'net-edge' + (bothCritical ? ' critical' : ''));
+      let cls = 'net-edge' + (bothCritical ? ' critical' : '') + (isDummy ? ' dummy' : '');
+      path.setAttribute('class', cls);
       path.setAttribute('marker-end', bothCritical ? 'url(#arrowRed)' : 'url(#arrowNeutral)');
       svg.appendChild(path);
     });
@@ -461,7 +466,7 @@ function buildGanttLinks(acts, minDate, chartWidth) {
     }
     const path = document.createElementNS(svgNS, 'path');
     path.setAttribute('d', d);
-    path.setAttribute('class', 'g-link' + (bothCrit ? ' critical' : ''));
+    path.setAttribute('class', 'g-link' + (bothCrit ? ' critical' : '') + (rel === 'SS' ? ' dummy' : ''));
     path.setAttribute('marker-end', bothCrit ? 'url(#gArrowRed)' : 'url(#gArrowCyan)');
     svg.appendChild(path);
   });
