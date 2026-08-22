@@ -31,7 +31,7 @@ if (window.__EMBEDDED_DATA__) {
     .then(bootstrap)
     .catch(err => {
       document.getElementById('app').innerHTML =
-        '<p style="padding:40px;color:#E9503F">ບໍ່ສາມາດໂຫຼດ data.json ໄດ້ / Could not load data.json — ' + err + '</p>';
+        '<p style="padding:40px;color:#D6432F">ບໍ່ສາມາດໂຫຼດ data.json ໄດ້ / Could not load data.json — ' + err + '</p>';
     });
 }
 
@@ -70,6 +70,9 @@ function renderTabs() {
       document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+      if (btn.dataset.tab === 'network') {
+        requestAnimationFrame(fitNetworkToScreen);
+      }
     });
   });
 }
@@ -213,9 +216,9 @@ function renderNetwork() {
   svg.innerHTML =
     '<defs>' +
       '<marker id="arrowNeutral" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">' +
-        '<path d="M0,0 L7,3.5 L0,7 Z" fill="#B9C7D6"/></marker>' +
+        '<path d="M0,0 L7,3.5 L0,7 Z" fill="#8AA1B4"/></marker>' +
       '<marker id="arrowRed" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">' +
-        '<path d="M0,0 L7,3.5 L0,7 Z" fill="#E9503F"/></marker>' +
+        '<path d="M0,0 L7,3.5 L0,7 Z" fill="#D6432F"/></marker>' +
     '</defs>';
 
   acts.forEach(a => {
@@ -274,6 +277,22 @@ function renderNetwork() {
 function applyZoom() {
   document.getElementById('networkCanvas').style.transform = 'scale(' + STATE.zoom + ')';
   document.getElementById('zoomLabel').textContent = Math.round(STATE.zoom * 100) + '%';
+}
+
+/* shrink the zoom until the whole network diagram fits inside the scroll area */
+function fitNetworkToScreen() {
+  const wrap = document.getElementById('networkScroll');
+  const canvas = document.getElementById('networkCanvas');
+  if (!wrap || !canvas || !STATE.netLayout) return;
+  const layout = STATE.netLayout;
+  const fullW = (layout.maxDepth + 1) * NET_COL_W + NET_PAD * 2;
+  const fullH = (layout.maxSlot + 1) * NET_ROW_H + NET_PAD * 2;
+  const pad = 60; // leave a little breathing room inside the scroll area
+  const availW = wrap.clientWidth - pad;
+  const availH = wrap.clientHeight - pad;
+  const scale = Math.min(availW / fullW, availH / fullH, 1.6);
+  STATE.zoom = Math.max(scale, 0.05);
+  applyZoom();
 }
 
 /* ---------------- gantt: MS-Project style table + timeline + link arrows ---------------- */
@@ -431,9 +450,9 @@ function buildGanttLinks(acts, minDate, chartWidth) {
   svg.innerHTML =
     '<defs>' +
       '<marker id="gArrowCyan" markerWidth="7" markerHeight="7" refX="5" refY="2.5" orient="auto">' +
-        '<path d="M0,0 L5,2.5 L0,5 Z" fill="#4A7FA7"/></marker>' +
+        '<path d="M0,0 L5,2.5 L0,5 Z" fill="#2E6B93"/></marker>' +
       '<marker id="gArrowRed" markerWidth="7" markerHeight="7" refX="5" refY="2.5" orient="auto">' +
-        '<path d="M0,0 L5,2.5 L0,5 Z" fill="#E9503F"/></marker>' +
+        '<path d="M0,0 L5,2.5 L0,5 Z" fill="#D6432F"/></marker>' +
     '</defs>';
 
   const idx = {};
@@ -531,7 +550,8 @@ function wireToolbars() {
   });
 
   document.getElementById('zoomIn').addEventListener('click', () => { STATE.zoom = Math.min(STATE.zoom + 0.15, 1.6); applyZoom(); });
-  document.getElementById('zoomOut').addEventListener('click', () => { STATE.zoom = Math.max(STATE.zoom - 0.15, 0.3); applyZoom(); });
+  document.getElementById('zoomOut').addEventListener('click', () => { STATE.zoom = Math.max(STATE.zoom - 0.15, 0.05); applyZoom(); });
+  document.getElementById('zoomFit').addEventListener('click', () => { fitNetworkToScreen(); });
 
   document.getElementById('tableSearch').addEventListener('input', e => renderTable(e.target.value));
 
